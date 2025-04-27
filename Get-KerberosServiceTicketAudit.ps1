@@ -12,7 +12,7 @@ OPTIONAL: If using an Event Forwarder to log eid 4769 (Kerberos TGS events) from
 
 .NOTES
 Comments: 1nTh35h311 (yossis@protonmail.com)
-v1.0
+v1.0.1
 
 .EXAMPLE
 .\Get-KerberosServiceTicketAudit.ps1
@@ -35,7 +35,8 @@ param (
         [cmdletbinding()]
         [string]$EventForwardingServerName = $null,
         [int]$HoursBack,
-        [ValidateSet("GRID+CSV","GRID ONLY")]$Output = "GRID+CSV"
+        [ValidateSet("GRID+CSV","GRID ONLY")]$Output = "GRID+CSV",
+        [switch]$AddSPNsListToReport
     )
 
 $CurrentEAP = $ErrorActionPreference;
@@ -120,7 +121,13 @@ if ($Output -ne "GRID ONLY") {
         $SW = New-Object System.IO.StreamWriter $ReportName
         $SW.AutoFlush = $true
 
-        $SW.WriteLine('UserName,DomainName,Service,ServiceSid,TicketOptions,EtypeDecimal,EtypeHex,EtypeFriendlyName,HashStrengthNotes,IPAddress,IPv4,ComputerName,TimeAccessed,DC')
+        if ($AddSPNsListToReport) {
+            $SW.WriteLine('UserName,DomainName,Service,ServiceSid,TicketOptions,EtypeDecimal,EtypeHex,EtypeFriendlyName,HashStrengthNotes,IPAddress,IPv4,ComputerName,TimeAccessed,DC,TransmittedServices,SPNs')
+        }
+        else
+            {
+            $SW.WriteLine('UserName,DomainName,Service,ServiceSid,TicketOptions,EtypeDecimal,EtypeHex,EtypeFriendlyName,HashStrengthNotes,IPAddress,IPv4,ComputerName,TimeAccessed,DC,TransmittedServices')
+        }
     }
 
 $SPNs = @();
@@ -134,7 +141,7 @@ $Events | foreach {
     $TicketOptions = $XML[4].'#text';
     $EtypeHex = $XML[5].'#text';
     $IPAddress = $XML[6].'#text';
-    $Port = $XML[7].'#text';
+    #$Port = $XML[7].'#text';
     $TrasmittedServices = $XML[-1].'#text';
     
     # Attempt to resolve client name    
@@ -155,9 +162,9 @@ $Events | foreach {
     # Set ticket encryption values (includes all public Kerberos etypes used by Microsoft and MIT implementations, as well as rare and reserved values, and a default clause for unrecognized values
     Switch ($EtypeHex.ToLower()) {
         "0x00" { $EtypeDecimal=0;  $EtypeFriendlyName='NULL or UNKNOWN'; $HashStrengthNotes='Invalid or error state' }
-        "0x01" { $EtypeDecimal=1;  $EtypeFriendlyName='des-cbc-crc'; $HashStrengthNotes='Deprecated, insecure' }
-        "0x02" { $EtypeDecimal=2;  $EtypeFriendlyName='des-cbc-md4'; $HashStrengthNotes='Deprecated, insecure' }
-        "0x03" { $EtypeDecimal=3;  $EtypeFriendlyName='des-cbc-md5'; $HashStrengthNotes='Deprecated, insecure' }
+        "0x01" { $EtypeDecimal=1;  $EtypeFriendlyName='des-cbc-crc'; $HashStrengthNotes='Deprecated; insecure' }
+        "0x02" { $EtypeDecimal=2;  $EtypeFriendlyName='des-cbc-md4'; $HashStrengthNotes='Deprecated; insecure' }
+        "0x03" { $EtypeDecimal=3;  $EtypeFriendlyName='des-cbc-md5'; $HashStrengthNotes='Deprecated; insecure' }
         "0x04" { $EtypeDecimal=4;  $EtypeFriendlyName='[reserved]'; $HashStrengthNotes='Reserved or unknown use' }
         "0x05" { $EtypeDecimal=5;  $EtypeFriendlyName='des3-cbc-md5'; $HashStrengthNotes='Weak legacy algorithm' }
         "0x06" { $EtypeDecimal=6;  $EtypeFriendlyName='[reserved]'; $HashStrengthNotes='Reserved or unknown use' }
@@ -170,19 +177,20 @@ $Events | foreach {
         "0x0e" { $EtypeDecimal=14; $EtypeFriendlyName='rsaES-OAEP-ENV-OID'; $HashStrengthNotes='Non-TGT OID encoding' }
         "0x0f" { $EtypeDecimal=15; $EtypeFriendlyName='des-ede3-cbc-Env-OID'; $HashStrengthNotes='Non-TGT OID encoding' }
         "0x10" { $EtypeDecimal=16; $EtypeFriendlyName='des3-cbc-sha1-kd'; $HashStrengthNotes='Weak legacy algorithm' }
-        "0x11" { $EtypeDecimal=17; $EtypeFriendlyName='aes128-cts-hmac-sha1-96'; $HashStrengthNotes='Acceptable, SHA1 HMAC' }
-        "0x12" { $EtypeDecimal=18; $EtypeFriendlyName='aes256-cts-hmac-sha1-96'; $HashStrengthNotes='Acceptable, SHA1 HMAC' }
-        "0x17" { $EtypeDecimal=23; $EtypeFriendlyName='rc4-hmac'; $HashStrengthNotes='Deprecated, weak (RC4)' }
+        "0x11" { $EtypeDecimal=17; $EtypeFriendlyName='aes128-cts-hmac-sha1-96'; $HashStrengthNotes='Acceptable; SHA1 HMAC' }
+        "0x12" { $EtypeDecimal=18; $EtypeFriendlyName='aes256-cts-hmac-sha1-96'; $HashStrengthNotes='Acceptable; SHA1 HMAC' }
+        "0x17" { $EtypeDecimal=23; $EtypeFriendlyName='rc4-hmac'; $HashStrengthNotes='Deprecated; weak (RC4)' }
         "0x18" { $EtypeDecimal=24; $EtypeFriendlyName='rc4-hmac-exp'; $HashStrengthNotes='Deprecated' }
         "0x19" { $EtypeDecimal=25; $EtypeFriendlyName='subkey-keymaterial'; $HashStrengthNotes='Rare or internal use' }
         "0x1a" { $EtypeDecimal=26; $EtypeFriendlyName='aes128-cts-hmac-sha256-128'; $HashStrengthNotes='Strong (SHA-256 HMAC)' }
-        "0x1b" { $EtypeDecimal=27; $EtypeFriendlyName='aes256-cts-hmac-sha384-192'; $HashStrengthNotes='Strong (SHA-384 HMAC), Quantum-resilient candidate (Not PQC resistant)' }
-        "0x1e" { $EtypeDecimal=30; $EtypeFriendlyName='camellia128-cts-cmac'; $HashStrengthNotes='Rare, not widely adopted' }
-        "0x1f" { $EtypeDecimal=31; $EtypeFriendlyName='camellia256-cts-cmac'; $HashStrengthNotes='Rare, not widely adopted' }
+        "0x1b" { $EtypeDecimal=27; $EtypeFriendlyName='aes256-cts-hmac-sha384-192'; $HashStrengthNotes='Strong (SHA-384 HMAC); Quantum-resilient candidate (Not PQC resistant)' }
+        "0x1e" { $EtypeDecimal=30; $EtypeFriendlyName='camellia128-cts-cmac'; $HashStrengthNotes='Rare; not widely adopted' }
+        "0x1f" { $EtypeDecimal=31; $EtypeFriendlyName='camellia256-cts-cmac'; $HashStrengthNotes='Rare; not widely adopted' }
         Default { $EtypeDecimal = [convert]::ToInt32($HexEtype, 16); $EtypeFriendlyName = "[Unknown]"; $HashStrengthNotes = "Unlisted or vendor-specific" }
     }
 
     # Handle SPNs
+    if ($AddSPNsListToReport) {
     $SPNData = $([adsisearcher]"(samaccountname=$Service)").FindOne().Properties.serviceprincipalname;
 
     if ($($SPNData | Measure-Object).Count -gt 1) {
@@ -193,13 +201,13 @@ $Events | foreach {
     {
         $SPNs = ($SPNData | Out-String).Trim()
     }
-   
+    }
+
     # add properties to the event object
     Add-Member -InputObject $_ -MemberType NoteProperty -Name UserName -Value $UserName -Force;
     Add-Member -InputObject $_ -MemberType NoteProperty -Name DomainName -Value $DomainName -Force;
     Add-Member -InputObject $_ -MemberType NoteProperty -Name Service -Value $Service -Force;
     Add-Member -InputObject $_ -MemberType NoteProperty -Name ServiceSid -Value $ServiceSid -Force;
-    Add-Member -InputObject $_ -MemberType NoteProperty -Name SPNs -Value $SPNs -Force;
     Add-Member -InputObject $_ -MemberType NoteProperty -Name TicketOptions -Value $TicketOptions -Force;
     Add-Member -InputObject $_ -MemberType NoteProperty -Name EtypeDecimal -Value $EtypeDecimal -Force;
     Add-Member -InputObject $_ -MemberType NoteProperty -Name EtypeHex -Value $EtypeHex -Force;
@@ -209,14 +217,21 @@ $Events | foreach {
     Add-Member -InputObject $_ -MemberType NoteProperty -Name IPv4 -Value $IPv4 -Force;
     Add-Member -InputObject $_ -MemberType NoteProperty -Name ComputerName -Value $ComputerName -Force;
     Add-Member -InputObject $_ -MemberType NoteProperty -Name TransmittedServices -Value $TrasmittedServices -Force;
+    if ($AddSPNsListToReport) {Add-Member -InputObject $_ -MemberType NoteProperty -Name SPNs -Value $SPNs -Force}
     # + TimeCreated, DC (MachineName) from event object
 
     # save to report, if specified
     if ($Output -ne "GRID ONLY") {
-            $SW.WriteLine("$UserName,$DomainName,$Service,$ServiceSid,$TicketOptions,$EtypeDecimal,$EtypeHex,$EtypeFriendlyName,$HashStrengthNotes,$IPAddress,$IPv4,$ComputerName,$($_.TimeCreated),$($_.MachineName)")
+            if ($AddSPNsListToReport) {
+                $SW.WriteLine("$UserName,$DomainName,$Service,$ServiceSid,$TicketOptions,$EtypeDecimal,$EtypeHex,$EtypeFriendlyName,$HashStrengthNotes,$IPAddress,$IPv4,$ComputerName,$($_.TimeCreated),$($_.MachineName),$TrasmittedServices,$SPNs")
+            }
+            else
+                {
+                $SW.WriteLine("$UserName,$DomainName,$Service,$ServiceSid,$TicketOptions,$EtypeDecimal,$EtypeHex,$EtypeFriendlyName,$HashStrengthNotes,$IPAddress,$IPv4,$ComputerName,$($_.TimeCreated),$($_.MachineName),$TrasmittedServices")
+            }
         }
 
-    Clear-Variable XML, UserName, DomainName, IPAddress, ServiceSid, IPv4, TicketOptions, etypehex, Port, Computername, Service, TimeCreated, SPNs, SPNData -ErrorAction SilentlyContinue
+    Clear-Variable XML, UserName, DomainName, IPAddress, ServiceSid, IPv4, TicketOptions, etypehex, Computername, Service, TimeCreated, transmittedservices, SPNs, SPNData -ErrorAction SilentlyContinue
 }
 
 ## Wrap up
@@ -228,7 +243,7 @@ $WeakDeprecated = $Events | Where-Object {$_.EtypeHEx -in "0x01","0x02","0x03","
 
 if ($WeakDeprecated)
     {
-        "Total Number of Weak\Deprecated Kerberos Service events: $("{0:N0}" -f $WeakDeprecated.Count)"
+        "Total Number of Weak\Deprecated Kerberos Service events: $("{0:N0}" -f $WeakDeprecated.Count)`n"
     }
 
 # show total count per ticket eType
@@ -248,12 +263,19 @@ if ($Output -ne "GRID ONLY") {
 
         else
             {
-                Write-Host "Report saved to $ReportName." -NoNewline -ForegroundColor Green
+                "`nReport saved to $ReportName."
             }
     }
 
 # Open grid with detailed events
-$Events | select username, DomainName, service, ServiceSid, ticketoptions, etypeDecimal, eTypeHex, eTypeFriendlyName, HashStrengthNotes, ipaddress, ipv4, computername,  @{n='TimeAccessed';e={$_.TimeCreated}}, @{n='DC';e={$($_.MachineName).toupper()}}, transmittedservices, SPNs | Out-GridView -Title "Kerberos Service Tickets Audit - Cipher & Hash Report";
+if ($AddSPNsListToReport)
+    {
+        $Events | select username, DomainName, service, ServiceSid, ticketoptions, etypeDecimal, eTypeHex, eTypeFriendlyName, HashStrengthNotes, ipaddress, ipv4, computername,  @{n='TimeAccessed';e={$_.TimeCreated}}, @{n='DC';e={$($_.MachineName).toupper()}}, transmittedservices, SPNs | Out-GridView -Title "Kerberos Service Tickets Cipher & Hash Audit Report"
+    }
+else
+    {
+        $Events | select username, DomainName, service, ServiceSid, ticketoptions, etypeDecimal, eTypeHex, eTypeFriendlyName, HashStrengthNotes, ipaddress, ipv4, computername,  @{n='TimeAccessed';e={$_.TimeCreated}}, @{n='DC';e={$($_.MachineName).toupper()}}, transmittedservices | Out-GridView -Title "Kerberos Service Tickets Cipher & Hash Audit Report"
+    }
 
 # release events data from memory
 Clear-Variable Events;
