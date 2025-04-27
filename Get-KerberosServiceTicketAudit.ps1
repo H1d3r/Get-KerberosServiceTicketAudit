@@ -12,7 +12,8 @@ OPTIONAL: If using an Event Forwarder to log eid 4769 (Kerberos TGS events) from
 
 .NOTES
 Comments: 1nTh35h311 (yossis@protonmail.com)
-v1.0.1
+v1.0.2 - Added PAC Enumeration detection/S4U (Note: the Account performing is the enum is the SERVICE field)
+v1.0.1 - Fixed issue with report + added new param to include SPNs (AddSPNsListToReport) - default: not included
 
 .EXAMPLE
 .\Get-KerberosServiceTicketAudit.ps1
@@ -201,6 +202,12 @@ $Events | foreach {
     {
         $SPNs = ($SPNData | Out-String).Trim()
     }
+    }
+
+    # Check for potential S4u / PAC Enumeration
+    if ($_.KeywordsDisplayNames -eq 'Audit Failure' -and $XML[8].'#text' -eq '0x1b') {
+        $HashStrengthNotes = '[!] PAC Enumeration / S4U'
+        Write-Verbose "[!] PAC Enumeration / S4U performed by user $Service"
     }
 
     # add properties to the event object
