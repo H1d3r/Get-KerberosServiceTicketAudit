@@ -30,10 +30,10 @@ Analyses all kerberos service tickets from the DCs and opens a grid. No report s
 Analyses all kerberos service tickets from an event forwarder server (does not collect events from DCs).<br>
 Note: Event forwarder should contain eid 4769 from DC(s)<br><br>
 
-#### Sample screenshots ####
+#### Sample screenshots: ####
 ![Sample results](/screenshots/Get-KerberosServiceAudit1.png) <br>
-##### Results summary sample #####
+###### Screen shot 1: Results summary sample ######
 ![Sample results](/screenshots/Get-KerberosServiceAudit2.png) <br>
-##### Sample results grid #####
+###### Screen shot 2: Sample results grid ######
 ![Sample results](/screenshots/Get-KerberosServiceAudit3.png) <br>
-##### Sample grid - showing weak/legacy & deprecated encryption #####
+###### Screen shot 3: Sample grid - showing weak/legacy & deprecated encryption ######
