@@ -1,5 +1,6 @@
 ## Get-KerberosServiceTicketAudit - Cipher & Hash Report ##
 Helps to assess Kerberos Cipher and Hash usage in Active Directory environments (e.g. Weak/Deprecated encryption types, or Quantum-resilient candidates).<br>
+##### Also detects PAC enumerations (S4U). The account performing the enum is the SERVICE field (shown also when running with -Verbose)<br><br>
 
 #### DESCRIPTION ####
 Analyses all TGS found in Security event logs of all Domain Controllers in the AD domain (requires 'Event Log Readers' permissions, or equivalent/admin on DCs).<br>
