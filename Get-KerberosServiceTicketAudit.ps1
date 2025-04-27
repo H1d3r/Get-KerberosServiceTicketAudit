@@ -32,8 +32,8 @@ Analyses all kerberos service tickets from an event forwarder server (does not c
 Note: Event forwarder should contain eid 4769 from DC(s)
 #>
 
+[cmdletbinding()]
 param (
-        [cmdletbinding()]
         [string]$EventForwardingServerName = $null,
         [int]$HoursBack,
         [ValidateSet("GRID+CSV","GRID ONLY")]$Output = "GRID+CSV",
