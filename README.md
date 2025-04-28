@@ -38,3 +38,5 @@ Note: Event forwarder should contain eid 4769 from DC(s)<br><br>
 ###### Screen shot 2: Sample results grid ######
 ![Sample results](/screenshots/Get-KerberosServiceAudit3.png) <br>
 ###### Screen shot 3: Sample grid - showing weak/legacy & deprecated encryption ######
+![Sample results](/screenshots/Get-KerberosServiceAudit4pac.png) <br>
+###### Screen shot 4: Showing PAC Enumeration (s4u) performed by user CAI from client 10.0.0.20 ######
