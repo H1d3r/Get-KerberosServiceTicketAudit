@@ -12,7 +12,8 @@ OPTIONAL: If using an Event Forwarder to log eid 4769 (Kerberos TGS events) from
 
 .NOTES
 Comments: 1nTh35h311 (yossis@protonmail.com)
-v1.0.2 - Added PAC Enumeration detection/S4U (Note: the Account performing is the enum is the SERVICE field)
+v1.0.3 - Added better error handling on initial access (e.g. when attempted to perform an unauthorized operation)
+v1.0.2 - Added S4U and/or Potential PAC Enumeration detection (Note: the Account performing is the enum is the SERVICE field)
 v1.0.1 - Fixed issue with report + added new param to include SPNs (AddSPNsListToReport) - default: not included
 
 .EXAMPLE
@@ -64,14 +65,20 @@ $FilterFwdEvents = @'
 # Set report name
 $ReportName = "$(Get-Location)\KerberosServiceTicketsAudit_$(get-date -Format ddMMyyyyHHmmss).csv";
 
-if (!$EventForwardingServerName)
+
     # Query DCs Security event logs directly (default)
-    {
-        $Events = $DCs | ForEach-Object {
-                $DC = $_;
-                # ensure connectivity and at least 1 TGS event for each DC
-                if (Get-WinEvent -FilterXml $FilterDC -ComputerName $DC -MaxEvents 1)
+if (!$EventForwardingServerName)                
+{
+    $Events = $DCs | ForEach-Object {
+            $DC = $_;
+            # ensure connectivity and at least 1 TGS event for each DC
+            $TestForEvent = Get-WinEvent -FilterXml $FilterDC -ComputerName $DC -MaxEvents 1;
+            if (!$? -or $($TestForEvent | Measure-Object).Count -lt 1)
                 {
+                        Write-Host "[!] No TGS events found or Access Error on domain controller $DC.`n$($Error[0].Exception.Message)" -ForegroundColor Yellow;
+                }
+            else
+            {
                     Write-Host "Fetching events from domain controller $DC (parsing $("{0:N0}" -f ((Get-WinEvent -ComputerName $DC -ListLog Security).RecordCount)) entries)..."
                     if ($HoursBack)
                         {
@@ -82,17 +89,19 @@ if (!$EventForwardingServerName)
                             Get-WinEvent -FilterXml $FilterDC -ComputerName $DC
                         }
                 }
-                else
-                {
-                    Write-Host "[!] No TGS events found or Access Error on domain controller $DC.`n$($Error[0].Exception.Message)" -ForegroundColor Yellow
-                }
-            }
-    }
+        }
+}
 else 
     # Query an event forwarding server log
     {
         # ensure connectivity and at least 1 TGS event found at the forwarding server
-        if (Get-WinEvent -FilterXml $FilterFwdEvents -ComputerName $EventForwardingServerName -MaxEvents 1)
+        $TestForEvent = Get-WinEvent -FilterXml $FilterFwdEvents -ComputerName $EventForwardingServerName -MaxEvents 1;
+        if (!$? -or $($TestForEvent | Measure-Object).Count -lt 1)
+            {
+                Write-Host "[!] No TGS events found or Access Error on $EventForwardingServerName.`n$($Error[0].Exception.Message)" -ForegroundColor Yellow;
+                break
+            }
+        else
         {
         Write-Host "Fetching events from Event Forwarder $EventForwardingServerName (parsing $("{0:N0}" -f ((Get-WinEvent -ComputerName $EventForwardingServerName -ListLog forwardedEvents).RecordCount)) entries)..."
         if ($HoursBack)
@@ -103,11 +112,6 @@ else
                     {
                         $Events = Get-WinEvent -FilterXml $FilterFwdEventsFromDateTime -ComputerName $EventForwardingServerName
                     }
-        }
-        else
-        {
-            Write-Host "[!] No TGS events found or Access Error on $EventForwardingServerName.`n$($Error[0].Exception.Message)" -ForegroundColor Yellow;
-            break
         }
     }
 
@@ -206,8 +210,8 @@ $Events | foreach {
 
     # Check for potential S4u / PAC Enumeration
     if ($_.KeywordsDisplayNames -eq 'Audit Failure' -and $XML[8].'#text' -eq '0x1b') {
-        $HashStrengthNotes = '[!] PAC Enumeration / S4U'
-        Write-Verbose "[!] PAC Enumeration / S4U performed by user $Service"
+        $HashStrengthNotes = '[!] S4U | Potential PAC Enumeration'
+        Write-Verbose "[!] S4U performed by user $Service | Potential PAC Enumeration"
     }
 
     # add properties to the event object
