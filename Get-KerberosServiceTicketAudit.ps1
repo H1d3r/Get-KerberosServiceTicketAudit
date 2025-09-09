@@ -12,6 +12,7 @@ OPTIONAL: If using an Event Forwarder to log eid 4769 (Kerberos TGS events) from
 
 .NOTES
 Comments: 1nTh35h311 (yossis@protonmail.com)
+v1.0.4 - Moved to xPath filter to mildly speed up event collection
 v1.0.3 - Added better error handling on initial access (e.g. when attempted to perform an unauthorized operation)
 v1.0.2 - Added S4U and/or Potential PAC Enumeration detection (Note: the Account performing is the enum is the SERVICE field)
 v1.0.1 - Fixed issue with report + added new param to include SPNs (AddSPNsListToReport) - default: not included
@@ -46,6 +47,7 @@ $ErrorActionPreference = "silentlycontinue";
 
 $DCs = (([adsisearcher]'(&(objectCategory=computer)(userAccountControl:1.2.840.113556.1.4.803:=8192))').FindAll() | select -ExpandProperty properties).dnshostname;
 
+# deprecated: previous xml filters (not used on v1.0.4)
 $FilterDC = @'
 <QueryList>
   <Query Id="0" Path="Security">
@@ -62,17 +64,16 @@ $FilterFwdEvents = @'
 </QueryList>
 '@
 
-# Set report name
+# Set report file name
 $ReportName = "$(Get-Location)\KerberosServiceTicketsAudit_$(get-date -Format ddMMyyyyHHmmss).csv";
 
-
-    # Query DCs Security event logs directly (default)
+# Query DCs Security event logs directly (default)
 if (!$EventForwardingServerName)                
 {
     $Events = $DCs | ForEach-Object {
             $DC = $_;
             # ensure connectivity and at least 1 TGS event for each DC
-            $TestForEvent = Get-WinEvent -FilterXml $FilterDC -ComputerName $DC -MaxEvents 1;
+            $TestForEvent = Get-WinEvent -FilterXPath "*[System[EventID=4769]]" -LogName security -ComputerName $DC -MaxEvents 1;
             if (!$? -or $($TestForEvent | Measure-Object).Count -lt 1)
                 {
                         Write-Host "[!] No TGS events found or Access Error on domain controller $DC.`n$($Error[0].Exception.Message)" -ForegroundColor Yellow;
@@ -82,11 +83,12 @@ if (!$EventForwardingServerName)
                     Write-Host "Fetching events from domain controller $DC (parsing $("{0:N0}" -f ((Get-WinEvent -ComputerName $DC -ListLog Security).RecordCount)) entries)..."
                     if ($HoursBack)
                         {
-                            Get-WinEvent -ComputerName $DC -FilterHashtable @{Logname='Security';id =4769;StartTime=$((Get-Date).AddHours(-$HoursBack))}
+                            $HoursbackInMs = $Hoursback * 3600000;
+                            Get-WinEvent -ComputerName $DC -Logname Security -FilterXPath "*[System[(EventID=4624) and TimeCreated[timediff(@SystemTime) <= $HoursBackInMS]]]"
                         }
                     else
                         {
-                            Get-WinEvent -FilterXml $FilterDC -ComputerName $DC
+                            Get-WinEvent -FilterXPath "*[System[EventID=4769]]" -LogName security -ComputerName $DC
                         }
                 }
         }
@@ -95,7 +97,7 @@ else
     # Query an event forwarding server log
     {
         # ensure connectivity and at least 1 TGS event found at the forwarding server
-        $TestForEvent = Get-WinEvent -FilterXml $FilterFwdEvents -ComputerName $EventForwardingServerName -MaxEvents 1;
+        $TestForEvent = Get-WinEvent -FilterXPath "*[System[EventID=4769]]" -LogName 'ForwardedEvents' -ComputerName $EventForwardingServerName -MaxEvents 1;
         if (!$? -or $($TestForEvent | Measure-Object).Count -lt 1)
             {
                 Write-Host "[!] No TGS events found or Access Error on $EventForwardingServerName.`n$($Error[0].Exception.Message)" -ForegroundColor Yellow;
@@ -106,11 +108,12 @@ else
         Write-Host "Fetching events from Event Forwarder $EventForwardingServerName (parsing $("{0:N0}" -f ((Get-WinEvent -ComputerName $EventForwardingServerName -ListLog forwardedEvents).RecordCount)) entries)..."
         if ($HoursBack)
                     {
-                        $Events = Get-WinEvent -ComputerName $EventForwardingServerName -FilterHashtable @{Logname='ForwardedEvents';id =4769;StartTime=$((Get-Date).AddHours(-$HoursBack))}
+                        $HoursbackInMs = $Hoursback * 3600000;
+                        $Events = Get-WinEvent -ComputerName $EventForwardingServerName -Logname 'ForwardedEvents' -FilterXPath "*[System[(EventID=4624) and TimeCreated[timediff(@SystemTime) <= $HoursBackInMS]]]"
                     }
                 else
                     {
-                        $Events = Get-WinEvent -FilterXml $FilterFwdEventsFromDateTime -ComputerName $EventForwardingServerName
+                        $Events = Get-WinEvent -FilterXPath "*[System[EventID=4769]]"  -Logname 'ForwardedEvents' -ComputerName $EventForwardingServerName
                     }
         }
     }
