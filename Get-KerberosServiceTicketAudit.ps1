@@ -84,7 +84,7 @@ if (!$EventForwardingServerName)
                     if ($HoursBack)
                         {
                             $HoursbackInMs = $Hoursback * 3600000;
-                            Get-WinEvent -ComputerName $DC -Logname Security -FilterXPath "*[System[(EventID=4624) and TimeCreated[timediff(@SystemTime) <= $HoursBackInMS]]]"
+                            Get-WinEvent -ComputerName $DC -Logname Security -FilterXPath "*[System[(EventID=4769) and TimeCreated[timediff(@SystemTime) <= $HoursBackInMS]]]"
                         }
                     else
                         {
@@ -109,7 +109,7 @@ else
         if ($HoursBack)
                     {
                         $HoursbackInMs = $Hoursback * 3600000;
-                        $Events = Get-WinEvent -ComputerName $EventForwardingServerName -Logname 'ForwardedEvents' -FilterXPath "*[System[(EventID=4624) and TimeCreated[timediff(@SystemTime) <= $HoursBackInMS]]]"
+                        $Events = Get-WinEvent -ComputerName $EventForwardingServerName -Logname 'ForwardedEvents' -FilterXPath "*[System[(EventID=4769) and TimeCreated[timediff(@SystemTime) <= $HoursBackInMS]]]"
                     }
                 else
                     {
